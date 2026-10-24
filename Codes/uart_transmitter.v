@@ -1,5 +1,3 @@
-`define OVERSAMPLING
-
 module uart_transmitter(
     clk, tick, rst, start, tx,
     ready_o, data_i
@@ -12,10 +10,10 @@ module uart_transmitter(
 `endif
     input [7:0] data_i;
 
-    reg [2:0] data_counter;
+    reg [3:0] data_counter;
     reg [2:0] ps, ns;
     reg [7:0] shift_reg;
-    reg shift_en, shift_init, data_ctr_en, data_ctr_init, keep_frame_err;
+    reg shift_en, data_ctr_en, data_ctr_init;
 
     localparam [2:0] idle = 0, init_state = 1, start_bit = 2, data_transmit = 3, parity_send = 4, end_bit = 5;
 
@@ -32,7 +30,7 @@ module uart_transmitter(
 
     // Main FSM
 
-    always @(posedge clk) begin
+    always @(/* posedge clk */*) begin
         ns <= idle;
         case (ps)
             idle: ns <= start ? init_state:idle;
@@ -49,7 +47,7 @@ module uart_transmitter(
 `ifdef OVERSAMPLING
                 && (tx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
 `endif
-                && (data_counter == 3'b111)) ? 
+                && (data_counter == 4'b1000)) ? 
 `ifdef PARITY_ENABLE
                   parity_send:
 `else
@@ -89,7 +87,7 @@ module uart_transmitter(
 `ifdef OVERSAMPLING
         tx_ctr_init <= 1'b0;
         tx_ctr_en <= 1'b0;
-        threebit_start <= 1'b0;
+        // threebit_start <= 1'b0;
 `endif
 // `ifdef PARITY_ENABLE
 //         parity_error <= 0;
@@ -108,18 +106,17 @@ module uart_transmitter(
                 ready_o <= 1'b1;
             end
             // init_state:
-`ifdef OVERSAMPLING
             start_bit: begin
                 tx <= 1'b0;
+`ifdef OVERSAMPLING
                 tx_ctr_en <= 1'b1;
-                // threebit_start <= (tx_tick_counter == middle_num) ? 1'b1:1'b0;
-            end
 `endif
+            end
             data_transmit: begin
 `ifdef OVERSAMPLING
                 tx_ctr_en <= 1'b1;
                 // threebit_start <= (tx_tick_counter == middle_num) ? 1'b1:1'b0;
-                shift_en <= (tx_tick_counter == (`OVERSAMPLING_FACTOR - 1)) ? 1'b1:1'b0;
+                shift_en <= (tick && (tx_tick_counter == (`OVERSAMPLING_FACTOR - 1))) ? 1'b1:1'b0;
 `else
                 shift_en <= 1'b1;
 `endif
@@ -131,25 +128,15 @@ module uart_transmitter(
             parity_send: begin
 `ifdef OVERSAMPLING
                 tx_ctr_en <= 1'b1;
-                threebit_start <= (tx_tick_counter == middle_num) ? 1'b1:1'b0;
-                if (threebit_ready & (par_bit != tx_maj)) keep_par_err = 1;
-`else
-                if (tick & (par_bit != rx)) keep_par_err = 1;
 `endif
+                tx <= par_bit;
             end
 `endif
             end_bit: begin
-                keep_frame_err = 0;
-`ifdef PARITY_ENABLE
-                parity_error <= keep_par_err;
-`endif
 `ifdef OVERSAMPLING
                 tx_ctr_en <= 1'b1;
-                threebit_start <= (tx_tick_counter == middle_num) ? 1'b1:1'b0;
-                if (threebit_ready & (!tx_maj)) keep_frame_err = 1;
-`else
-                if (tick & (!rx)) keep_frame_err = 1;
 `endif
+                tx <= 1'b1;
             end
         endcase
     end
@@ -161,9 +148,13 @@ module uart_transmitter(
     end
 `endif
 
-    always @(posedge tick) begin
+    always @(posedge tick, posedge data_ctr_init) begin
         if (data_ctr_init) data_counter = 0;
-        else if (data_ctr_en && (tx_tick_counter = (`OVERSAMPLING_FACTOR - 1))) data_counter = data_counter + 1;
+        else if (data_ctr_en
+`ifdef OVERSAMPLING
+         & (tx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
+`endif
+         ) data_counter = data_counter + 1;
     end
 
     always @(posedge clk) begin
@@ -180,6 +171,11 @@ module uart_transmitter(
 `endif
             shift_reg = {1'b0, shift_reg[7:1]};
         end
+    end
+
+    always @(posedge clk) begin
+        if(rst) ps <= idle;
+        else ps <= ns;
     end
 
 endmodule

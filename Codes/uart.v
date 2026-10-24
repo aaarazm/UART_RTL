@@ -6,11 +6,13 @@ module uart(
     frame_error
 );
 
-    input clk, rst, Rx, transmit_start, data_i; 
+    input clk, rst, Rx, transmit_start;
+    input [7:0] data_i; 
 `ifdef PARITY_ENABLE
     output parity_error;
 `endif
-    output frame_error, Tx, transmit_ready, receive_ready, data_o, receive_valid;
+    output frame_error, Tx, transmit_ready, receive_ready, receive_valid;
+    output [7:0]  data_o;
 
     wire tick;
 

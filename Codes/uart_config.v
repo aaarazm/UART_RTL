@@ -4,5 +4,5 @@
 `define BAUD_RATE 115200
 
 `ifdef OVERSAMPLING
-    `define OVERSAMPLING_FACTOR 16 // Either 16 or 8
+    `define OVERSAMPLING_FACTOR 16 // Either 16 or 8 (not 4 yet!)
 `endif

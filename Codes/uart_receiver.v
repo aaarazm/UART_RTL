@@ -1,5 +1,3 @@
-// `define OVERSAMPLING
-
 module uart_receiver(
     clk, tick, rst, rx,
 `ifdef PARITY_ENABLE
@@ -15,7 +13,7 @@ module uart_receiver(
 `endif
     output [7:0] data_o;
 
-    reg [2:0] data_counter;
+    reg [3:0] data_counter;
     reg [2:0] ps, ns;
     reg [7:0] shift_reg;
     reg shift_en, shift_init, data_ctr_en, data_ctr_init, keep_frame_err, keep_valid;
@@ -30,12 +28,12 @@ module uart_receiver(
     reg [rx_ctr_width-1:0] rx_tick_counter;
     reg rx_ctr_init, rx_ctr_en, threebit_start;
     wire threebit_ready, rx_maj;
-    threebitmaj (.tick(tick), .start(threebit_start), .rx(rx), .maj(rx_maj), .ready(threebit_ready));
+    threebitmaj majority_inst(.tick(tick), .start(threebit_start), .rx(rx), .maj(rx_maj), .ready(threebit_ready));
 `endif
 
     // Main FSM
 
-    always @(posedge clk) begin
+    always @(/* posedge clk */*) begin
         ns <= idle;
         case (ps)
             idle: begin
@@ -63,8 +61,9 @@ module uart_receiver(
                 ns <= (tick
 `ifdef OVERSAMPLING
                  && (rx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
+                //  && (rx_tick_counter == 0)
 `endif
-                  && (data_counter == 3'b111)) ? 
+                  && (data_counter == 4'b1000)) ? 
 `ifdef PARITY_ENABLE
                   parity_check:
 `else
@@ -84,7 +83,7 @@ module uart_receiver(
             end_bit: begin
                 ns <= (tick 
 `ifdef OVERSAMPLING
-                && (tx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
+                && (rx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
 `endif
                 ) ? idle:end_bit;
             end
@@ -146,29 +145,35 @@ module uart_receiver(
 
 `ifdef PARITY_ENABLE
             parity_check: begin
-                keep_par_err = 0;
+                // keep_par_err = 0;
 `ifdef OVERSAMPLING
                 rx_ctr_en <= 1'b1;
                 threebit_start <= (rx_tick_counter == middle_num) ? 1'b1:1'b0;
-                if (threebit_ready & (par_bit != rx_maj)) keep_par_err = 1;
+                if (threebit_ready) begin
+                    keep_par_err = (par_bit != rx_maj) ? 1'b1:1'b0;
+                end
 `else
-                if (tick & (par_bit != rx)) keep_par_err = 1;
+                keep_par_err = (tick & (par_bit != rx)) ? 1'b1:1'b0;
 `endif
             end
 `endif
             end_bit: begin
-                keep_frame_err = 0;
+                // keep_frame_err = 0;
 `ifdef PARITY_ENABLE
                 parity_error <= keep_par_err;
+                keep_valid <= ~(keep_par_err | keep_frame_err);
+`else
+                keep_valid <= ~(keep_frame_err);
 `endif
 `ifdef OVERSAMPLING
                 rx_ctr_en <= 1'b1;
                 threebit_start <= (rx_tick_counter == middle_num) ? 1'b1:1'b0;
-                if (threebit_ready & (~rx_maj)) keep_frame_err = 1;
+                if (threebit_ready) begin
+                    keep_frame_err = rx_maj ? 1'b0:1'b1;
+                end
 `else
-                if (tick & (~rx)) keep_frame_err = 1;
+                keep_frame_err = (tick & (~rx)) ? 1'b1:1'b0;
 `endif
-                keep_valid <= ~(keep_par_err | keep_frame_err);
             end
         endcase
     end
@@ -182,12 +187,16 @@ module uart_receiver(
 
     always @(posedge tick) begin
         if (data_ctr_init) data_counter = 0;
-        else if (data_ctr_en && (rx_tick_counter = (`OVERSAMPLING_FACTOR - 1))) data_counter = data_counter + 1;
+        else if (data_ctr_en
+`ifdef OVERSAMPLING
+         & (rx_tick_counter == (`OVERSAMPLING_FACTOR - 1))
+`endif
+         ) data_counter = data_counter + 1;
     end
 
     always @(posedge tick) begin
         if (shift_init) begin
-            shift_reg = 0;
+            shift_reg = shift_reg;
 `ifdef PARITY_ENABLE
             par_bit = 0;
 `endif
