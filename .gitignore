@@ -1,1 +1,6 @@
 /Synth
+/sim/gate_work
+/sim/work
+sim/transcript
+sim/vsim.wlf
+sim/nativelink_setup.do

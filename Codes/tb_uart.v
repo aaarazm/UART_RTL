@@ -2,7 +2,7 @@
 
 module tb_uart();
     
-    reg clk, rst,/*  Rx,  */transmit_start;
+    reg clk, rst, Rx, transmit_start;
     reg [7:0] data_i;
 `ifdef PARITY_ENABLE
     wire parity_error;
@@ -17,7 +17,7 @@ module tb_uart();
     uart uut(
         .clk(clk),
         .rst(rst),
-        .Rx(Tx), // echo test
+        .Rx(Rx),
         .Tx(Tx),
         .transmit_ready(transmit_ready),
         .receive_ready(receive_ready),
@@ -37,12 +37,25 @@ module tb_uart();
         #(50*clk_period_ns + 13) rst = 1;
         #(clk_period_ns) rst = 0;
         #(clk_period_ns) transmit_start = 1;
-        #(clk_period_ns) transmit_start = 1;
-        #(clk_period_ns) transmit_start = 0;
+        #(clk_period_ns*2) transmit_start = 0;
         #(clk_period_ns) data_i = 8'b01010101;
         @(posedge transmit_ready) #(2*clk_period_ns) transmit_start = 1;
         #(clk_period_ns) transmit_start = 0;
+        #(clk_period_ns) data_i = 8'b10110111;
+        @(posedge transmit_ready) #(2*clk_period_ns) transmit_start = 1;
+        #(clk_period_ns) transmit_start = 0;
+        #(clk_period_ns) data_i = 8'b11011010;
+        @(posedge transmit_ready) #(2*clk_period_ns) transmit_start = 1;
+        #(clk_period_ns) transmit_start = 0;
         @(posedge transmit_ready) #(200*clk_period_ns) $stop;
+    end
+
+    always @(*) begin
+        if(data_i == 8'b11011010 & (uut.transmitter_inst.ps == 4 | uut.transmitter_inst.ps == 5))
+                Rx = ~Tx;
+            // faulty parity and end_frame bits to see if the receiver raises error or not
+        else
+            Rx <= Tx; // echo test
     end
 
 endmodule

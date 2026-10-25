@@ -60,7 +60,7 @@ add wave -noupdate -expand -group {Baud Gen} /tb_uart/uut/baudgen_inst/counter
 add wave -noupdate -expand -group {Baud Gen} /tb_uart/uut/baudgen_inst/ns
 add wave -noupdate -expand -group {Baud Gen} /tb_uart/uut/baudgen_inst/ps
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {103850 ns} 0}
+WaveRestoreCursors {{Cursor 1} {290763 ns} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 170
 configure wave -valuecolwidth 100
@@ -76,4 +76,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits ns
 update
-WaveRestoreZoom {0 ns} {220427 ns}
+WaveRestoreZoom {0 ns} {328220 ns}
